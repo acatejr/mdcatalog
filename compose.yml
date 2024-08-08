@@ -1,0 +1,63 @@
+services:
+
+  mdcatalog:
+    container_name: mdcatalog
+    image: mdcatalog
+    build: .
+    env_file:
+      - .env
+    volumes:
+      - $PWD:/mdcatalog
+      # - static:/var/www/static
+      # - media:/var/www/media
+    stdin_open: true
+    tty: true
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    ports:
+      - 8000:8000
+    # command: "gunicorn main.wsgi:application --bind '0.0.0.0:8000' --reload"
+
+  postgres:
+    container_name: mdcatalogdb
+    image: postgres:latest
+    env_file: .env
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  admin:
+    image: adminer
+    depends_on: 
+      - postgres
+    ports:
+      - 8080:8080
+
+  # caddy:
+  #   container_name: mdcatalog_caddy
+  #   image: caddy:latest    
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     # Caddy specific urls
+  #     - $PWD/caddy/Caddyfile:/etc/caddy/Caddyfile
+  #     - type: volume
+  #       source: media
+  #       target: /usr/share/caddy/media
+  #       read_only: true
+  #       volume:
+  #         nocopy: true
+  #     - type: volume
+  #       source: static
+  #       target: /usr/share/caddy/static
+  #       read_only: true
+  #       volume:
+  #         nocopy: true
+  #   restart: unless-stopped
+
+volumes:
+  pgdata:
+  # static:
+  # media:

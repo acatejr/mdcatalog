@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+pytest
+pytest-sugar
+psycopg2-binary
+ruff
+strawberry-graphql[fastapi]
+sqlalchemy
+alembic
+typer
+bs4
+requests
+arrow
+python-dotenv
+lxml
