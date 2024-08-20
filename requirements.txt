@@ -1,11 +1,9 @@
-fastapi
-uvicorn
+# fastapi
+# uvicorn
 pytest
 pytest-sugar
 psycopg2-binary
 ruff
-strawberry-graphql[fastapi]
-strawberry-sqlalchemy-mapper
 sqlalchemy
 alembic
 typer
@@ -14,7 +12,3 @@ requests
 arrow
 python-dotenv
 lxml
-# starlette-graphene3
-# graphene 
-# graphene-sqlalchemy 
-pydantic

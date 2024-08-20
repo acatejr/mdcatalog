@@ -3,7 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 import re, os
 import arrow
-from sqlalchemy import create_engine, or_
+from sqlalchemy import create_engine, or_, select
 from sqlalchemy.orm import sessionmaker, declarative_base
 from dotenv import load_dotenv
 from models import Domain, Asset
@@ -12,10 +12,14 @@ load_dotenv()
 
 Base = declarative_base()
 
-PG_USER = os.environ.get("POSTGRES_USER")
-PG_PASS = os.environ.get("POSTGRES_PASSWORD")
-dburl = f"postgresql+psycopg2://{PG_USER}:{PG_PASS}@mdcatalogdb/postgres"
-engine = create_engine(dburl)
+POSTGRES_USER = os.environ.get("POSTGRES_USER")
+POSTGRES_PASSWORD = os.environ.get("POSTGRES_PASSWORD")
+POSTGRES_HOST = os.environ.get("POSTGRES_HOST")
+POSTGRES_DATABASE = os.environ.get("POSTGRES_DATABASE")
+DATABASE_URI = f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}/{POSTGRES_DATABASE}"
+
+# engine = create_engine(DATABASE_URI,echo=True)
+engine = create_engine(DATABASE_URI)
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 session = Session()
@@ -27,6 +31,11 @@ def remove_html(text):
     txt = re.sub("<[^<]+?>", "", text).replace("\n", "")
     return txt
 
+
+def save_asset_keywords(id, keywords):
+
+    for kw in keywords:
+        print(kw)
 
 @app.command()
 def load_data_dot_gov():
@@ -56,18 +65,30 @@ def load_data_dot_gov():
         desc = remove_html(description)
         title = resp["title"]
         modified = arrow.get(resp["modified"])
+        keywords = resp["keyword"]
 
-        asset = Asset(title=title, description=desc, domain_id=domain.id, metadata_url=url)
+        asset = session.execute(select(Asset).filter_by(metadata_url=url)).scalar_one()
+        if asset:
+            asset.title = title
+            asset.description = desc
+        else:
+            asset = Asset(
+                title=title, description=desc, domain_id=domain.id, metadata_url=url
+            )
 
         session.add(asset)
         session.commit()
 
+        # if asset.id and keywords:
+        #     save_asset_keywords(asset.id, keywords)
 
 @app.command()
 def load_fsgeodata():
-    domain = session.query(Domain).filter(Domain.name == "US Forest Service Geodata").first()
+    domain = (
+        session.query(Domain).filter(Domain.name == "US Forest Service Geodata").first()
+    )
     base_url = "https://data.fs.usda.gov/geodata/edw/datasets.php"
-    
+
     print("Loading data from FSGeodata Clearinghouse Metdata URLs.")
     # Read the page that has the matedata links and cache locally
     resp = requests.get(base_url)
@@ -81,16 +102,19 @@ def load_fsgeodata():
 
     for url in metadata_urls:
         url = f"https://data.fs.usda.gov/geodata/edw/{url}"
-       
+
         resp = requests.get(url)
         soup = BeautifulSoup(resp.content, features="xml")
-        title = remove_html(soup.find("title").get_text())   
+        title = remove_html(soup.find("title").get_text())
         desc_block = soup.find("descript")
         abstract = remove_html(desc_block.find("abstract").get_text())
 
-        existing_asset = session.query(Asset).filter(or_(Asset.metadata_url == url, Asset.title == title)).first()
+        existing_asset = (
+            session.query(Asset)
+            .filter(or_(Asset.metadata_url == url, Asset.title == title))
+            .first()
+        )
         if not existing_asset:
-
             asset = Asset(
                 metadata_url=url,
                 title=title,
@@ -101,6 +125,7 @@ def load_fsgeodata():
             session.add(asset)
 
     session.commit()
+
 
 if __name__ == "__main__":
     app()
