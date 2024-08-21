@@ -18,3 +18,9 @@ https://medium.com/@ryk.kiel/graphql-and-fastapi-the-ultimate-combination-for-bu
 alembic revision -m "Add new table"  
 alembic upgrade head  
 alembic revision --autogenerate -m "Add asset keywords model"  
+
+## Complete SQLAlchemy/Alembic Migrations Reset  
+1. Empty ./alembic/versions folder.  
+2. Empty ./alembic/versions/__pycache__ folder.  
+3. Delete alembic_version in database.  
+4. Delete object tables if needed.  

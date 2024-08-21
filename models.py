@@ -37,6 +37,7 @@ class Asset(Base):
     metadata_url = Column(String(1000), unique=True)
     keywords = relationship("Keyword", back_populates="asset")
 
+
     def __str__(self):
         return f"{self.title}"
 
@@ -48,4 +49,5 @@ class Keyword(Base):
     id = Column(Integer, primary_key=True, index=True)
     word = Column(String(250))
     asset_id = Column(Integer(), ForeignKey("assets.id"))
+    asset = relationship("Asset", back_populates="keywords")
     created_at = Column(DateTime(timezone=True), server_default=func.now())

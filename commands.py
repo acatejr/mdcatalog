@@ -6,7 +6,7 @@ import arrow
 from sqlalchemy import create_engine, or_, select
 from sqlalchemy.orm import sessionmaker, declarative_base
 from dotenv import load_dotenv
-from models import Domain, Asset
+from models import Domain, Asset, Keyword
 
 load_dotenv()
 
@@ -34,8 +34,12 @@ def remove_html(text):
 
 def save_asset_keywords(id, keywords):
 
-    for kw in keywords:
-        print(kw)
+    for w in keywords:
+        if w not in ["None"]:
+            keyword = Keyword(asset_id=id, word=w)
+            session.add(keyword)
+
+    session.commit()
 
 @app.command()
 def load_data_dot_gov():
@@ -67,7 +71,7 @@ def load_data_dot_gov():
         modified = arrow.get(resp["modified"])
         keywords = resp["keyword"]
 
-        asset = session.execute(select(Asset).filter_by(metadata_url=url)).scalar_one()
+        asset = session.execute(select(Asset).filter_by(metadata_url=url)).scalar_one_or_none()
         if asset:
             asset.title = title
             asset.description = desc
@@ -79,8 +83,8 @@ def load_data_dot_gov():
         session.add(asset)
         session.commit()
 
-        # if asset.id and keywords:
-        #     save_asset_keywords(asset.id, keywords)
+        if asset.id and keywords:
+            save_asset_keywords(asset.id, keywords)
 
 @app.command()
 def load_fsgeodata():
@@ -100,7 +104,7 @@ def load_fsgeodata():
         if anchor and anchor.get_text() == "metadata":
             metadata_urls.append(anchor["href"])
 
-    for url in metadata_urls:
+    for url in metadata_urls[0:1]:
         url = f"https://data.fs.usda.gov/geodata/edw/{url}"
 
         resp = requests.get(url)
@@ -108,21 +112,37 @@ def load_fsgeodata():
         title = remove_html(soup.find("title").get_text())
         desc_block = soup.find("descript")
         abstract = remove_html(desc_block.find("abstract").get_text())
+        keywords = [kw.get_text() for kw in soup.find_all("themekt")]
 
-        existing_asset = (
-            session.query(Asset)
-            .filter(or_(Asset.metadata_url == url, Asset.title == title))
-            .first()
-        )
-        if not existing_asset:
+        asset = session.execute(select(Asset).filter_by(metadata_url=url)).scalar_one_or_none()
+        if asset:
+            asset.title = title
+            asset.description = abstract
+        else:
             asset = Asset(
-                metadata_url=url,
-                title=title,
-                description=abstract,
-                domain_id=domain.id,
-                # modified=str(date_of_last_refresh),
+                title=title, description=abstract, domain_id=domain.id, metadata_url=url
             )
-            session.add(asset)
+
+        session.add(asset)
+        session.commit()
+
+        if asset.id and keywords:
+            save_asset_keywords(asset.id, keywords)
+
+        # existing_asset = (
+        #     session.query(Asset)
+        #     .filter(or_(Asset.metadata_url == url, Asset.title == title))
+        #     .first()
+        # )
+        # if not existing_asset:
+        #     asset = Asset(
+        #         metadata_url=url,
+        #         title=title,
+        #         description=abstract,
+        #         domain_id=domain.id,
+        #         # modified=str(date_of_last_refresh),
+        #     )
+        #     session.add(asset)
 
     session.commit()
 
