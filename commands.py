@@ -18,7 +18,6 @@ POSTGRES_HOST = os.environ.get("POSTGRES_HOST")
 POSTGRES_DATABASE = os.environ.get("POSTGRES_DATABASE")
 DATABASE_URI = f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}/{POSTGRES_DATABASE}"
 
-# engine = create_engine(DATABASE_URI,echo=True)
 engine = create_engine(DATABASE_URI)
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
@@ -36,10 +35,17 @@ def save_asset_keywords(id, keywords):
 
     for w in keywords:
         if w not in ["None"]:
-            keyword = Keyword(asset_id=id, word=w)
-            session.add(keyword)
+
+            keyword = session.execute(
+                select(Keyword).filter(or_(Keyword.asset_id == id, Keyword.word == w))
+            ).first() #.scalar_one_or_none()
+
+            if not keyword:
+                keyword = Keyword(asset_id=id, word=w)
+                session.add(keyword)
 
     session.commit()
+
 
 @app.command()
 def load_data_dot_gov():
@@ -71,7 +77,9 @@ def load_data_dot_gov():
         modified = arrow.get(resp["modified"])
         keywords = resp["keyword"]
 
-        asset = session.execute(select(Asset).filter_by(metadata_url=url)).scalar_one_or_none()
+        asset = session.execute(
+            select(Asset).filter_by(metadata_url=url)
+        ).scalar_one_or_none()
         if asset:
             asset.title = title
             asset.description = desc
@@ -85,6 +93,7 @@ def load_data_dot_gov():
 
         if asset.id and keywords:
             save_asset_keywords(asset.id, keywords)
+
 
 @app.command()
 def load_fsgeodata():
@@ -104,7 +113,7 @@ def load_fsgeodata():
         if anchor and anchor.get_text() == "metadata":
             metadata_urls.append(anchor["href"])
 
-    for url in metadata_urls[0:1]:
+    for url in metadata_urls[:]:
         url = f"https://data.fs.usda.gov/geodata/edw/{url}"
 
         resp = requests.get(url)
@@ -114,7 +123,11 @@ def load_fsgeodata():
         abstract = remove_html(desc_block.find("abstract").get_text())
         keywords = [kw.get_text() for kw in soup.find_all("themekt")]
 
-        asset = session.execute(select(Asset).filter_by(metadata_url=url)).scalar_one_or_none()
+        asset = session.execute(
+            # select(Asset).filter_by(metadata_url=url)
+            select(Asset).filter(or_(Asset.metadata_url == url, Asset.title == title))
+        ).scalar_one_or_none()
+
         if asset:
             asset.title = title
             asset.description = abstract

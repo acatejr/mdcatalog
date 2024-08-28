@@ -17,9 +17,9 @@ services:
   #     - 8000:8000
 
   postgres:
-    container_name: mdcatalogdb
+    # container_name: mdcatalogdb
     image: postgres:latest
-    env_file: .env
+    env_file: .env.dev
     restart: unless-stopped
     ports:
       - 5432:5432
@@ -28,7 +28,7 @@ services:
 
   admin:
     image: adminer
-    depends_on: 
+    depends_on:
       - postgres
     ports:
       - 8080:8080
